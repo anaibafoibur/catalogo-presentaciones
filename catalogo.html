@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Catálogo Interactivo - Índice</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background: url('fondo.jpg') no-repeat center center fixed;
+      background-size: cover;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: Montserrat, sans-serif;
+      overflow: hidden;
+    }
+    canvas {
+      background: transparent;
+      box-shadow: 0px 0px 20px rgba(0,0,0,0.2);
+      transition: transform 0.3s ease;
+      cursor: pointer;
+      border: none;
+    }
+    canvas:hover {
+      transform: scale(1.02);
+    }
+    p {
+      margin-top: 10px;
+      color: white;
+      font-size: 24px;
+      text-align: center;
+      font-weight: 600;
+      transition: opacity 0.5s;
+    }
+    #volverBtn {
+      display: none;
+      position: absolute;
+      top: 40px;
+      padding: 10px 20px;
+      background-color: #808080; 
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    #volverBtn:hover {
+      background-color: #555555;
+    }
+    .ocultar {
+      opacity: 0;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="catalogo" width="900" height="700"></canvas>
+<p id="textoPortada">Haz clic en una portada para abrir la presentación 📖</p>
+<button id="volverBtn">🔙 Volver al Índice</button>
+
+<script>
+const canvas = document.getElementById('catalogo');
+const ctx = canvas.getContext('2d');
+const volverBtn = document.getElementById('volverBtn');
+const textoPortada = document.getElementById('textoPortada');
+
+const portadas = [
+  { src: 'portada1.png', x: 50,  y: 50,  detalle: 'detalle1.png' },
+  { src: 'portada2.png', x: 500, y: 50,  detalle: 'detalle2.png' },
+  { src: 'portada3.png', x: 50,  y: 400, detalle: 'detalle3.png' },
+  { src: 'portada4.png', x: 500, y: 400, detalle: 'detalle4.png' }
+];
+
+let enIndice = true;
+let imagenDetalleActual = null;
+let alpha = 0; 
+let zoomFactor = 1; 
+let imagenCentroX = 0; 
+let imagenCentroY = 0; 
+let offsetX = 0; 
+let offsetY = 0; 
+let isDragging = false; 
+let dragStartX = 0; // Para almacenar la posición de inicio del clic
+let dragStartY = 0; // Para almacenar la posición de inicio del clic
+
+portadas.forEach(p => {
+  const img = new Image();
+  img.src = p.src;
+  p.image = img;
+});
+
+function dibujarIndice() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  portadas.forEach(p => {
+    if (p.image.complete) {
+      dibujarImagenAdaptada(p.image, p.x, p.y, 350, 300);
+    } else {
+      p.image.onload = () => dibujarImagenAdaptada(p.image, p.x, p.y, 350, 300);
+    }
+  });
+  volverBtn.style.display = 'none';
+  textoPortada.classList.remove('ocultar');
+}
+
+function dibujarImagenAdaptada(img, x, y, maxWidth, maxHeight) {
+  const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
+  const newWidth = img.width * ratio;
+  const newHeight = img.height * ratio;
+  ctx.drawImage(img, x, y, newWidth, newHeight);
+}
+
+function cargarDetalle(detalleSrc) {
+  enIndice = false;
+  imagenDetalleActual = new Image();
+  imagenDetalleActual.src = detalleSrc;
+  imagenDetalleActual.onload = () => {
+    alpha = 0;
+    zoomFactor = 1; 
+    imagenCentroX = (canvas.width - imagenDetalleActual.width) / 2;
+    imagenCentroY = (canvas.height - imagenDetalleActual.height) / 2;
+    requestAnimationFrame(fadeInDetalle);
+  };
+  volverBtn.style.display = 'inline-block';
+  textoPortada.classList.add('ocultar');
+}
+
+function fadeInDetalle() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(imagenDetalleActual, imagenCentroX + offsetX, imagenCentroY + offsetY, imagenDetalleActual.width * zoomFactor, imagenDetalleActual.height * zoomFactor);
+  ctx.globalAlpha = 1;
+
+  if (alpha < 1) {
+    alpha += 0.02;
+    requestAnimationFrame(fadeInDetalle);
+  }
+}
+
+canvas.addEventListener('click', function(evt) {
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = evt.clientX - rect.left;
+  const mouseY = evt.clientY - rect.top;
+
+  if (enIndice) {
+    for (let i = 0; i < portadas.length; i++) {
+      const p = portadas[i];
+      const width = 350;
+      const height = 300;
+      if (mouseX >= p.x && mouseX <= p.x + width &&
+          mouseY >= p.y && mouseY <= p.y + height) {
+        cargarDetalle(p.detalle);
+        return;
+      }
+    }
+  }
+});
+
+volverBtn.addEventListener('click', function() {
+  enIndice = true;
+  imagenDetalleActual = null;
+  dibujarIndice();
+});
+
+canvas.addEventListener('wheel', function(evt) {
+  if (!enIndice && imagenDetalleActual) {
+    if (evt.deltaY < 0) {
+      zoomFactor *= 1.1; 
+    } else {
+      zoomFactor /= 1.1; 
+    }
+    fadeInDetalle();
+  }
+});
+
+canvas.addEventListener('dblclick', function() {
+  if (!enIndice && imagenDetalleActual) {
+    zoomFactor = Math.min(canvas.width / imagenDetalleActual.width, canvas.height / imagenDetalleActual.height);
+    offsetX = (canvas.width - imagenDetalleActual.width * zoomFactor) / 2;
+    offsetY = (canvas.height - imagenDetalleActual.height * zoomFactor) / 2;
+    fadeInDetalle();
+  }
+});
+
+canvas.addEventListener('mousedown', function(evt) {
+  if (!enIndice && imagenDetalleActual) {
+    isDragging = true;
+    const rect = canvas.getBoundingClientRect();
+    dragStartX = evt.clientX - rect.left - offsetX;
+    dragStartY = evt.clientY - rect.top - offsetY;
+  }
+});
+
+canvas.addEventListener('mousemove', function(evt) {
+  if (isDragging && !enIndice && imagenDetalleActual) {
+    const rect = canvas.getBoundingClientRect();
+    offsetX = evt.clientX - rect.left - dragStartX;
+    offsetY = evt.clientY - rect.top - dragStartY;
+    fadeInDetalle();
+  }
+});
+
+canvas.addEventListener('mouseup', function() {
+  isDragging = false;
+});
+
+canvas.addEventListener('mouseleave', function() {
+  isDragging = false;
+});
+
+dibujarIndice();
+</script>
+
+</body>
+</html>
